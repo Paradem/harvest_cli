@@ -111,7 +111,7 @@ func main() {
 		log.Fatalf("Failed to create time entry: %v", err)
 	}
 
-	fmt.Printf("Created time entry ID %d for project %d task %d\n", resp.ID, resp.ProjectID, resp.TaskID)
+	fmt.Printf("Created time entry ID %d for project %s task %s\n", resp.ID, resp.Project.Name, resp.Task.Name)
 
 	// Save defaults
 	cfg.ProjectID = selectedProjectID

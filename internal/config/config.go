@@ -14,13 +14,7 @@ type Config struct {
 
 // DefaultConfigPath returns the default config file path (~/.harvestcli/config.json).
 func DefaultConfigPath() string {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return ""
-	}
-	dir := filepath.Join(home, ".harvestcli")
-	_ = os.MkdirAll(dir, 0o700)
-	return filepath.Join(dir, "config.json")
+	return filepath.Join("./", ".harvestcli.json")
 }
 
 // Load reads the config file if it exists. If not, returns empty Config and nil error.

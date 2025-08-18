@@ -111,11 +111,10 @@ func (c *Client) CreateTimeEntry(entry TimeEntryRequest) (*TimeEntryResponse, er
 	if err != nil {
 		return nil, err
 	}
-	var res struct {
-		TimeEntry TimeEntryResponse `json:"time_entry"`
-	}
+	var res TimeEntryResponse
+
 	if err := c.do(req, &res); err != nil {
 		return nil, err
 	}
-	return &res.TimeEntry, nil
+	return &res, nil
 }
