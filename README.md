@@ -28,6 +28,17 @@ go build -o harvest_cli ./cmd
 ```
 
 ## Usage
+
+You must set the environment variables for your api key.
+
+The application uses:
+HARVEST_ACCOUNT_ID
+HARVEST_ACCESS_TOKEN
+
+Easiest way to do this is to use mise in your home dir. OR just set them in your
+shell config - but since they need to be around for every project you should set
+them somewhere global.
+
 On first run it will prompt you for the project and default task you want to
 use in this directory. From then on you can just call it with the `-n` flag so
 that you can set your message.
