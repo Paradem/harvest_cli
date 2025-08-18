@@ -21,6 +21,12 @@ most basic values. None of the "huh?" widgets. It will just be an experiment to
 try and get that working - right now what it has is more than enough for what
 needs to be done.
 
+## Build it
+
+```bash
+go build -o harvest_cli ./cmd
+```
+
 ## Usage
 On first run it will prompt you for the project and default task you want to
 use in this directory. From then on you can just call it with the `-n` flag so
