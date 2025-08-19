@@ -13,9 +13,9 @@ type selectModel struct {
 	message string
 }
 
-func (m selectModel) Init() tea.Cmd { return nil }
+func (m *selectModel) Init() tea.Cmd { return nil }
 
-func (m selectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *selectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
@@ -36,7 +36,7 @@ func (m selectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m selectModel) View() string {
+func (m *selectModel) View() string {
 	s := fmt.Sprintf("%s\n", m.message)
 	for i, o := range m.options {
 		prefix := "  "
@@ -51,7 +51,7 @@ func (m selectModel) View() string {
 // SelectPrompt shows a list of options and returns the index of the chosen one.
 func SelectPrompt(options []string, message string) (int, error) {
 	m := selectModel{options: options, message: message}
-	p := tea.NewProgram(m)
+	p := tea.NewProgram(&m)
 	if _, err := p.Run(); err != nil {
 		return -1, err
 	}
@@ -66,9 +66,9 @@ type inputModel struct {
 	accepted bool
 }
 
-func (m inputModel) Init() tea.Cmd { return nil }
+func (m *inputModel) Init() tea.Cmd { return nil }
 
-func (m inputModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *inputModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
@@ -90,7 +90,7 @@ func (m inputModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m inputModel) View() string {
+func (m *inputModel) View() string {
 	prompt := fmt.Sprintf("%s\n> %s", m.message, m.input)
 	return prompt
 }
@@ -98,7 +98,7 @@ func (m inputModel) View() string {
 // InputPrompt asks the user for a single line of text.
 func InputPrompt(message string, defaultText string) (string, error) {
 	m := inputModel{message: message, input: defaultText}
-	p := tea.NewProgram(m)
+	p := tea.NewProgram(&m)
 	if _, err := p.Run(); err != nil {
 		return "", err
 	}
