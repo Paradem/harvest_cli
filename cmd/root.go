@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/example/harvestcli/internal/config"
@@ -24,7 +25,11 @@ func main() {
 
 	// Combine ticket with note if provided
 	if ticket != "" {
-		prefix := fmt.Sprintf("%s\n", ticket)
+		// Ensure ticket starts with '#'
+		if !strings.HasPrefix(ticket, "#") {
+			ticket = "#" + ticket
+		}
+		prefix := fmt.Sprintf("%s ", ticket)
 		if note != "" {
 			note = prefix + note
 		} else {
