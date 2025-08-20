@@ -24,7 +24,7 @@ func main() {
 
 	// Combine ticket with note if provided
 	if ticket != "" {
-		prefix := fmt.Sprintf("#%s\n", ticket)
+		prefix := fmt.Sprintf("%s\n", ticket)
 		if note != "" {
 			note = prefix + note
 		} else {
