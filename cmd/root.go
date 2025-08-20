@@ -14,11 +14,20 @@ import (
 func main() {
 	var note string
 	var configPath string
+	var ignoreConfig bool
 	flag.StringVar(&note, "n", "", "Initial notes text")
 	flag.StringVar(&configPath, "c", config.DefaultConfigPath(), "Config file path")
+	flag.BoolVar(&ignoreConfig, "i", false, "Ignore loading local configuration")
 	flag.Parse()
 
-	cfg, err := config.Load(configPath)
+	var cfg *config.Config
+	var err error
+	if !ignoreConfig {
+		cfg, err = config.Load(configPath)
+	} else {
+		cfg = &config.Config{}
+	}
+
 	if err != nil {
 		log.Fatalf("Failed to load config: %v", err)
 	}
@@ -116,7 +125,10 @@ func main() {
 	// Save defaults
 	cfg.ProjectID = selectedProjectID
 	cfg.TaskID = selectedTaskID
-	if err := cfg.Save(configPath); err != nil {
-		log.Printf("Failed to save config: %v", err)
+	if !ignoreConfig {
+		if err := cfg.Save(configPath); err != nil {
+			log.Printf("Failed to save config: %v", err)
+		}
 	}
+
 }
