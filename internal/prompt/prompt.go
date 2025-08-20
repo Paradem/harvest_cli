@@ -2,6 +2,7 @@ package prompt
 
 import (
 	"fmt"
+	"os"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -9,6 +10,7 @@ import (
 // ---------- SELECT MODEL ----------
 type selectModel struct {
 	cursor  int
+	quit    bool
 	options []string
 	message string
 }
@@ -30,6 +32,7 @@ func (m *selectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "enter":
 			return m, tea.Quit
 		case "ctrl+c":
+			m.quit = true
 			return m, tea.Quit
 		}
 	}
@@ -50,16 +53,22 @@ func (m *selectModel) View() string {
 
 // SelectPrompt shows a list of options and returns the index of the chosen one.
 func SelectPrompt(options []string, message string) (int, error) {
-	m := selectModel{options: options, message: message}
+	m := selectModel{quit: false, options: options, message: message}
 	p := tea.NewProgram(&m)
 	if _, err := p.Run(); err != nil {
 		return -1, err
 	}
+
+	if m.quit {
+		os.Exit(0)
+	}
+
 	return m.cursor, nil
 }
 
 // ---------- INPUT MODEL ----------
 type inputModel struct {
+	quit     bool
 	cursor   int
 	input    string
 	message  string
@@ -76,6 +85,7 @@ func (m *inputModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.accepted = true
 			return m, tea.Quit
 		case "ctrl+c":
+			m.quit = true
 			return m, tea.Quit
 		case "backspace":
 			if len(m.input) > 0 {
@@ -97,10 +107,15 @@ func (m *inputModel) View() string {
 
 // InputPrompt asks the user for a single line of text.
 func InputPrompt(message string, defaultText string) (string, error) {
-	m := inputModel{message: message, input: defaultText}
+	m := inputModel{quit: false, message: message, input: defaultText}
 	p := tea.NewProgram(&m)
 	if _, err := p.Run(); err != nil {
 		return "", err
 	}
+
+	if m.quit {
+		os.Exit(0)
+	}
+
 	return m.input, nil
 }
