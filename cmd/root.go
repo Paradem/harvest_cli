@@ -18,7 +18,19 @@ func main() {
 	flag.StringVar(&note, "n", "", "Initial notes text")
 	flag.StringVar(&configPath, "c", config.DefaultConfigPath(), "Config file path")
 	flag.BoolVar(&ignoreConfig, "i", false, "Ignore loading local configuration")
+	var ticket string
+	flag.StringVar(&ticket, "t", "", "External ticket number to prefix notes")
 	flag.Parse()
+
+	// Combine ticket with note if provided
+	if ticket != "" {
+		prefix := fmt.Sprintf("#%s\n", ticket)
+		if note != "" {
+			note = prefix + note
+		} else {
+			note = prefix
+		}
+	}
 
 	var cfg *config.Config
 	var err error
