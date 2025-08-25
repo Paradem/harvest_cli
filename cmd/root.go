@@ -29,7 +29,7 @@ func main() {
 		if !strings.HasPrefix(ticket, "#") {
 			ticket = "#" + ticket
 		}
-		prefix := fmt.Sprintf("%s ", ticket)
+		prefix := fmt.Sprintf("%s\n", ticket)
 		if note != "" {
 			note = prefix + note
 		} else {
