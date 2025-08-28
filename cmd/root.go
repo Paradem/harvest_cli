@@ -43,9 +43,9 @@ func handleTimeEntrySelection(client *harvest.Client) {
 	// Create options for selection
 	entryOptions := make([]string, len(entries))
 	for i, entry := range entries {
-		status := "Stopped"
+		status := "\033[33mStopped\033[0m" // Yellow for stopped
 		if entry.IsRunning {
-			status = "Running"
+			status = "\033[32mRunning\033[0m" // Green for running
 		}
 		notes := ""
 		if entry.Notes != nil {
@@ -59,7 +59,8 @@ func handleTimeEntrySelection(client *harvest.Client) {
 				notes = notes[:57] + "..."
 			}
 			if notes != "" {
-				notes = "  " + notes
+				// Add cyan color highlighting for notes
+				notes = fmt.Sprintf("  \033[36m%s\033[0m", notes)
 			}
 		}
 		entryOptions[i] = fmt.Sprintf("%d: %s - %s (%s) [%.2fh]%s",
