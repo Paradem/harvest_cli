@@ -91,15 +91,86 @@ func handleTimeEntrySelection(client *harvest.Client) {
 		restartedEntry.ID, restartedEntry.Project.Name, restartedEntry.Task.Name)
 }
 
+func handleStatusDisplay(client *harvest.Client) {
+	// Get current user ID
+	userIDStr := os.Getenv("HARVEST_USER_ID")
+	if userIDStr == "" {
+		log.Fatalf("HARVEST_USER_ID environment variable must be set")
+	}
+
+	userID, err := strconv.ParseInt(userIDStr, 10, 64)
+	if err != nil {
+		log.Fatalf("Invalid HARVEST_USER_ID: %v", err)
+	}
+
+	// Get today's date for filtering
+	today := time.Now().Format("2006-01-02")
+
+	// List time entries for today filtered by current user
+	entries, err := client.ListTimeEntries(&today, &today, &userID)
+	if err != nil {
+		log.Fatalf("Failed to list time entries: %v", err)
+	}
+
+	// Find running entries
+	var runningEntry *harvest.TimeEntry
+	for _, entry := range entries {
+		if entry.IsRunning {
+			runningEntry = &entry
+			break // Take the first running entry (there should typically be only one)
+		}
+	}
+
+	if runningEntry == nil {
+		// No running timer - show [xx:xx]
+		fmt.Print("[xx:xx]")
+		return
+	}
+
+	// Calculate elapsed time
+	if runningEntry.TimerStartedAt == nil {
+		log.Fatalf("Timer started time is nil")
+	}
+	startTime, err := time.Parse(time.RFC3339, *runningEntry.TimerStartedAt)
+	if err != nil {
+		log.Fatalf("Failed to parse timer start time: %v", err)
+	}
+
+	elapsed := time.Since(startTime)
+	hours := int(elapsed.Hours())
+	minutes := int(elapsed.Minutes()) % 60
+
+	// Prepare notes display (first word of first line only)
+	notesDisplay := ""
+	if runningEntry.Notes != nil && *runningEntry.Notes != "" {
+		// Split by newline and take first line
+		lines := strings.Split(*runningEntry.Notes, "\n")
+		firstLine := strings.TrimSpace(lines[0])
+
+		// Split by space and take first word
+		words := strings.Fields(firstLine)
+		if len(words) > 0 {
+			notesDisplay = " " + words[0]
+		}
+	}
+
+	// Display running timer with [HH:MM] format
+	fmt.Printf("[%02d:%02d]%s",
+		hours, minutes,
+		notesDisplay)
+}
+
 func main() {
 	var note string
 	var configPath string
 	var ignoreConfig bool
 	var selectEntry bool
+	var showStatus bool
 	flag.StringVar(&note, "n", "", "Initial notes text")
 	flag.StringVar(&configPath, "c", config.DefaultConfigPath(), "Config file path")
 	flag.BoolVar(&ignoreConfig, "i", false, "Ignore loading local configuration")
 	flag.BoolVar(&selectEntry, "e", false, "Select and restart an existing time entry")
+	flag.BoolVar(&showStatus, "s", false, "Show current running timer status")
 	var ticket string
 	flag.StringVar(&ticket, "t", "", "External ticket number to prefix notes")
 	flag.Parse()
@@ -138,6 +209,12 @@ func main() {
 	// Handle time entry selection mode
 	if selectEntry {
 		handleTimeEntrySelection(client)
+		return
+	}
+
+	// Handle status display mode
+	if showStatus {
+		handleStatusDisplay(client)
 		return
 	}
 

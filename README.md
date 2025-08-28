@@ -65,6 +65,20 @@ This will:
 
 **Note**: The `HARVEST_USER_ID` environment variable must be set when using the `-e` flag.
 
+### Checking Timer Status
+
+Use the `-s` flag to check if you have any running timers:
+
+```bash
+./harvest_cli -s
+```
+
+This will show:
+- **No running timer**: `[xx:xx]` (in red)
+- **Running timer**: `[HH:MM] <first characters up to a space>` (in green)
+
+**Note**: The `HARVEST_USER_ID` environment variable must be set when using the `-s` flag.
+
 I plan to incorporate this application into my `gh issues` work flow so that I
 can choose the issue create the branch and start the timer all in one step.
 
