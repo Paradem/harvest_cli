@@ -148,7 +148,7 @@ func main() {
 	}
 	projectOptions := make([]string, len(projects))
 	for i, p := range projects {
-		projectOptions[i] = p.Name
+		projectOptions[i] = fmt.Sprintf("%s \033[36m(%s)\033[0m", p.Name, p.Client.Name)
 	}
 
 	var selectedProjectID int64
