@@ -34,10 +34,13 @@ You must set the environment variables for your api key.
 The application uses:
 HARVEST_ACCOUNT_ID
 HARVEST_ACCESS_TOKEN
+HARVEST_USER_ID (required for the `-e` flag)
 
 Easiest way to do this is to use mise in your home dir. OR just set them in your
 shell config - but since they need to be around for every project you should set
 them somewhere global.
+
+### Creating New Time Entries
 
 On first run it will prompt you for the project and default task you want to
 use in this directory. From then on you can just call it with the `-n` flag so
@@ -46,6 +49,21 @@ that you can set your message.
 ```bash
 ./harvest_cli -n "<your note goes here>"
 ```
+
+### Selecting and Restarting Existing Time Entries
+
+Use the `-e` flag to select from your existing time entries for today and restart them:
+
+```bash
+./harvest_cli -e
+```
+
+This will:
+1. Show all your time entries for the current day
+2. Allow you to select one using an interactive prompt
+3. Restart the selected time entry (if it's not already running)
+
+**Note**: The `HARVEST_USER_ID` environment variable must be set when using the `-e` flag.
 
 I plan to incorporate this application into my `gh issues` work flow so that I
 can choose the issue create the branch and start the timer all in one step.

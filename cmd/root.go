@@ -4,6 +4,8 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -12,13 +14,80 @@ import (
 	"github.com/example/harvestcli/internal/prompt"
 )
 
+func handleTimeEntrySelection(client *harvest.Client) {
+	// Get user ID from environment variable
+	userIDStr := os.Getenv("HARVEST_USER_ID")
+	if userIDStr == "" {
+		log.Fatalf("HARVEST_USER_ID environment variable must be set")
+	}
+
+	userID, err := strconv.ParseInt(userIDStr, 10, 64)
+	if err != nil {
+		log.Fatalf("Invalid HARVEST_USER_ID: %v", err)
+	}
+
+	// Get today's date for filtering
+	today := time.Now().Format("2006-01-02")
+
+	// List time entries for today filtered by current user
+	entries, err := client.ListTimeEntries(&today, &today, &userID)
+	if err != nil {
+		log.Fatalf("Failed to list time entries: %v", err)
+	}
+
+	if len(entries) == 0 {
+		fmt.Println("No time entries found for today.")
+		return
+	}
+
+	// Create options for selection
+	entryOptions := make([]string, len(entries))
+	for i, entry := range entries {
+		status := "Stopped"
+		if entry.IsRunning {
+			status = "Running"
+		}
+		notes := ""
+		if entry.Notes != nil {
+			notes = *entry.Notes
+		}
+		entryOptions[i] = fmt.Sprintf("%d: %s - %s (%s) [%.2fh] %s",
+			entry.ID, entry.Project.Name, entry.Task.Name, status, entry.Hours, notes)
+	}
+
+	// Show selection prompt
+	idx, err := prompt.SelectPrompt(entryOptions, "Select a time entry to restart:")
+	if err != nil {
+		log.Fatalf("Selection error: %v", err)
+	}
+
+	selectedEntry := entries[idx]
+
+	// Check if entry is already running
+	if selectedEntry.IsRunning {
+		fmt.Printf("Time entry %d is already running.\n", selectedEntry.ID)
+		return
+	}
+
+	// Restart the time entry
+	restartedEntry, err := client.RestartTimeEntry(selectedEntry.ID)
+	if err != nil {
+		log.Fatalf("Failed to restart time entry: %v", err)
+	}
+
+	fmt.Printf("Restarted time entry %d for project %s task %s\n",
+		restartedEntry.ID, restartedEntry.Project.Name, restartedEntry.Task.Name)
+}
+
 func main() {
 	var note string
 	var configPath string
 	var ignoreConfig bool
+	var selectEntry bool
 	flag.StringVar(&note, "n", "", "Initial notes text")
 	flag.StringVar(&configPath, "c", config.DefaultConfigPath(), "Config file path")
 	flag.BoolVar(&ignoreConfig, "i", false, "Ignore loading local configuration")
+	flag.BoolVar(&selectEntry, "e", false, "Select and restart an existing time entry")
 	var ticket string
 	flag.StringVar(&ticket, "t", "", "External ticket number to prefix notes")
 	flag.Parse()
@@ -52,6 +121,12 @@ func main() {
 	client, err := harvest.NewClient()
 	if err != nil {
 		log.Fatalf("Auth error: %v", err)
+	}
+
+	// Handle time entry selection mode
+	if selectEntry {
+		handleTimeEntrySelection(client)
+		return
 	}
 
 	// Projects selection

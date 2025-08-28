@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strings"
 )
 
 const baseURL = "https://api.harvestapp.com/v2"
@@ -113,6 +114,53 @@ func (c *Client) CreateTimeEntry(entry TimeEntryRequest) (*TimeEntryResponse, er
 	}
 	var res TimeEntryResponse
 
+	if err := c.do(req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+// ListTimeEntries fetches time entries with optional date and user filtering.
+func (c *Client) ListTimeEntries(from, to *string, userID *int64) ([]TimeEntry, error) {
+	path := "/time_entries"
+	params := make([]string, 0, 3)
+	if from != nil {
+		params = append(params, "from="+*from)
+	}
+	if to != nil {
+		params = append(params, "to="+*to)
+	}
+	if userID != nil {
+		params = append(params, fmt.Sprintf("user_id=%d", *userID))
+	}
+
+	if len(params) > 0 {
+		path += "?" + strings.Join(params, "&")
+	}
+
+	req, err := c.newRequest("GET", path, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var res struct {
+		TimeEntries []TimeEntry `json:"time_entries"`
+	}
+	if err := c.do(req, &res); err != nil {
+		return nil, err
+	}
+	return res.TimeEntries, nil
+}
+
+// RestartTimeEntry restarts a stopped time entry.
+func (c *Client) RestartTimeEntry(timeEntryID int64) (*TimeEntry, error) {
+	path := fmt.Sprintf("/time_entries/%d/restart", timeEntryID)
+	req, err := c.newRequest("PATCH", path, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var res TimeEntry
 	if err := c.do(req, &res); err != nil {
 		return nil, err
 	}
