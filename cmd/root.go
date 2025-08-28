@@ -49,9 +49,20 @@ func handleTimeEntrySelection(client *harvest.Client) {
 		}
 		notes := ""
 		if entry.Notes != nil {
-			notes = *entry.Notes
+			// Replace newlines with spaces and clean up formatting
+			notes = strings.ReplaceAll(*entry.Notes, "\n", " | ")
+			notes = strings.ReplaceAll(notes, "\r", " | ")
+			// Trim whitespace and add padding
+			notes = strings.TrimSpace(notes)
+			// Truncate very long notes to prevent wrapping issues
+			if len(notes) > 60 {
+				notes = notes[:57] + "..."
+			}
+			if notes != "" {
+				notes = "  " + notes
+			}
 		}
-		entryOptions[i] = fmt.Sprintf("%d: %s - %s (%s) [%.2fh] %s",
+		entryOptions[i] = fmt.Sprintf("%d: %s - %s (%s) [%.2fh]%s",
 			entry.ID, entry.Project.Name, entry.Task.Name, status, entry.Hours, notes)
 	}
 
