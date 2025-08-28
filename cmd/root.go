@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"math"
 	"os"
 	"strconv"
 	"strings"
@@ -122,23 +123,21 @@ func handleStatusDisplay(client *harvest.Client) {
 	}
 
 	if runningEntry == nil {
-		// No running timer - show [xx:xx]
-		fmt.Print("[xx:xx]")
+		// No running timer - show [xx:xx] in red (tmux compatible)
+		fmt.Print("#[fg=colour196][xx:xx]#[default]")
 		return
 	}
 
-	// Calculate elapsed time
-	if runningEntry.TimerStartedAt == nil {
-		log.Fatalf("Timer started time is nil")
-	}
-	startTime, err := time.Parse(time.RFC3339, *runningEntry.TimerStartedAt)
-	if err != nil {
-		log.Fatalf("Failed to parse timer start time: %v", err)
-	}
+	// Use total hours from the time entry (includes all accumulated time)
+	totalHours := runningEntry.Hours
+	hours := int(totalHours)
+	minutes := int(math.Ceil((totalHours - float64(hours)) * 60))
 
-	elapsed := time.Since(startTime)
-	hours := int(elapsed.Hours())
-	minutes := int(elapsed.Minutes()) % 60
+	// Handle case where minutes rounds up to 60 (should increment hours)
+	if minutes >= 60 {
+		hours++
+		minutes = 0
+	}
 
 	// Prepare notes display (first word of first line only)
 	notesDisplay := ""
@@ -154,8 +153,8 @@ func handleStatusDisplay(client *harvest.Client) {
 		}
 	}
 
-	// Display running timer with [HH:MM] format
-	fmt.Printf("[%02d:%02d]%s",
+	// Display running timer with [HH:MM] format in green (tmux compatible)
+	fmt.Printf("#[fg=colour46][%02d:%02d]#[default]%s",
 		hours, minutes,
 		notesDisplay)
 }
