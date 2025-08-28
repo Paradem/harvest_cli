@@ -148,7 +148,7 @@ func main() {
 	}
 	projectOptions := make([]string, len(projects))
 	for i, p := range projects {
-		projectOptions[i] = fmt.Sprintf("%d: %s", p.ID, p.Name)
+		projectOptions[i] = p.Name
 	}
 
 	var selectedProjectID int64
@@ -182,7 +182,7 @@ func main() {
 
 	taskOptions := make([]string, len(tasks))
 	for i, t := range tasks {
-		taskOptions[i] = fmt.Sprintf("%d: %s", t.ID, t.Name)
+		taskOptions[i] = t.Name
 	}
 
 	var selectedTaskID int64
