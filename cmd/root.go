@@ -63,8 +63,8 @@ func handleTimeEntrySelection(client *harvest.Client) {
 				notes = fmt.Sprintf("  \033[36m%s\033[0m", notes)
 			}
 		}
-		entryOptions[i] = fmt.Sprintf("%d: %s - %s (%s) [%.2fh]%s",
-			entry.ID, entry.Project.Name, entry.Task.Name, status, entry.Hours, notes)
+		entryOptions[i] = fmt.Sprintf("%s - %s (%s) [%.2fh]%s",
+			entry.Project.Name, entry.Task.Name, status, entry.Hours, notes)
 	}
 
 	// Show selection prompt
