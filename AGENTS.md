@@ -30,11 +30,13 @@ No `.cursor` or `.cursorrules` directories found. No Copilot instructions presen
 - **`-t <ticket>`**: Add ticket number prefix (auto-adds # if missing)
 - **`-e`**: Select and restart existing time entries for today
 - **`-s`**: Show current running timer status
+- **`-b`**: Format output for SketchyBar (plain text, must be used with `-s`)
 
-#### Environment Variables Required
-- `HARVEST_ACCOUNT_ID`: Harvest API account ID
-- `HARVEST_ACCESS_TOKEN`: Harvest API access token
-- `HARVEST_USER_ID`: User ID (required for `-e` and `-s` flags)
+#### Configuration
+The application now uses a global configuration file at `~/.config/harvest_cli/config.json` instead of environment variables. On first run, you'll be prompted to enter:
+- Harvest Account ID
+- Harvest Access Token
+- Harvest User ID
 
 ### Architecture Overview
 
@@ -113,20 +115,16 @@ internal/
 
 #### Testing the Application
 ```bash
-# Set required environment variables
-export HARVEST_ACCOUNT_ID="your_id"
-export HARVEST_ACCESS_TOKEN="your_token"
-export HARVEST_USER_ID="your_user_id"
-
-# Test different modes
+# On first run, you'll be prompted for configuration
 ./harvest_cli                    # Create new entry
 ./harvest_cli -e                 # Select existing entry
-./harvest_cli -s                 # Show status
+./harvest_cli -s                 # Show status (tmux format)
+./harvest_cli -s -b              # Show status (SketchyBar plain text format)
 ./harvest_cli -n "Working on feature"  # With notes
 ```
 
 #### Common Issues
-- **Missing Environment Variables**: Ensure all three are set
+- **Missing Configuration**: Run the app once to set up `~/.config/harvest_cli/config.json`
 - **API Rate Limits**: Harvest has rate limits, implement backoff if needed
 - **Time Zone Handling**: All times are in user's local timezone
 - **Timer Conflicts**: Only one running timer supported (Harvest limitation)

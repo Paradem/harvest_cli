@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"strings"
 )
 
@@ -19,14 +18,12 @@ type Client struct {
 	token      string
 }
 
-// NewClient creates a Harvest API client using env vars HARVEST_ACCOUNT_ID and HARVEST_ACCESS_TOKEN.
-func NewClient() (*Client, error) {
-	acc := os.Getenv("HARVEST_ACCOUNT_ID")
-	tok := os.Getenv("HARVEST_ACCESS_TOKEN")
-	if acc == "" || tok == "" {
-		return nil, fmt.Errorf("environment variables HARVEST_ACCOUNT_ID and HARVEST_ACCESS_TOKEN must be set")
+// NewClient creates a Harvest API client using the provided account ID and access token.
+func NewClient(accountID, accessToken string) (*Client, error) {
+	if accountID == "" || accessToken == "" {
+		return nil, fmt.Errorf("account ID and access token must be provided")
 	}
-	return &Client{httpClient: http.DefaultClient, accountID: acc, token: tok}, nil
+	return &Client{httpClient: http.DefaultClient, accountID: accountID, token: accessToken}, nil
 }
 
 func (c *Client) newRequest(method, path string, body interface{}) (*http.Request, error) {

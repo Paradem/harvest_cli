@@ -15,16 +15,61 @@ import (
 	"github.com/example/harvestcli/internal/prompt"
 )
 
-func handleTimeEntrySelection(client *harvest.Client) {
-	// Get user ID from environment variable
-	userIDStr := os.Getenv("HARVEST_USER_ID")
+func setupGlobalConfig(cfg *config.Config) error {
+	fmt.Println("Harvest CLI needs to be configured. Please provide the following information:")
+	fmt.Println()
+
+	// Prompt for account ID
+	accountID, err := prompt.InputPrompt("Harvest Account ID:", "")
+	if err != nil {
+		return fmt.Errorf("failed to get account ID: %v", err)
+	}
+	if accountID == "" {
+		return fmt.Errorf("account ID cannot be empty")
+	}
+
+	// Prompt for access token
+	accessToken, err := prompt.InputPrompt("Harvest Access Token:", "")
+	if err != nil {
+		return fmt.Errorf("failed to get access token: %v", err)
+	}
+	if accessToken == "" {
+		return fmt.Errorf("access token cannot be empty")
+	}
+
+	// Prompt for user ID
+	userID, err := prompt.InputPrompt("Harvest User ID:", "")
+	if err != nil {
+		return fmt.Errorf("failed to get user ID: %v", err)
+	}
+	if userID == "" {
+		return fmt.Errorf("user ID cannot be empty")
+	}
+
+	// Update config
+	cfg.HarvestAccountID = accountID
+	cfg.HarvestAccessToken = accessToken
+	cfg.HarvestUserID = userID
+
+	// Save config
+	if err := cfg.SaveGlobal(); err != nil {
+		return fmt.Errorf("failed to save global config: %v", err)
+	}
+
+	fmt.Println("Configuration saved successfully!")
+	return nil
+}
+
+func handleTimeEntrySelection(client *harvest.Client, userIDStr string, logger *log.Logger) {
 	if userIDStr == "" {
-		log.Fatalf("HARVEST_USER_ID environment variable must be set")
+		logger.Fatalf("User ID must be provided")
+		os.Exit(1)
 	}
 
 	userID, err := strconv.ParseInt(userIDStr, 10, 64)
 	if err != nil {
-		log.Fatalf("Invalid HARVEST_USER_ID: %v", err)
+		logger.Fatalf("Invalid user ID: %v", err)
+		os.Exit(1)
 	}
 
 	// Get today's date for filtering
@@ -33,7 +78,8 @@ func handleTimeEntrySelection(client *harvest.Client) {
 	// List time entries for today filtered by current user
 	entries, err := client.ListTimeEntries(&today, &today, &userID)
 	if err != nil {
-		log.Fatalf("Failed to list time entries: %v", err)
+		logger.Fatalf("Failed to list time entries: %v", err)
+		os.Exit(1)
 	}
 
 	if len(entries) == 0 {
@@ -71,7 +117,8 @@ func handleTimeEntrySelection(client *harvest.Client) {
 	// Show selection prompt
 	idx, err := prompt.SelectPrompt(entryOptions, "Select a time entry to restart:")
 	if err != nil {
-		log.Fatalf("Selection error: %v", err)
+		logger.Fatalf("Selection error: %v", err)
+		os.Exit(1)
 	}
 
 	selectedEntry := entries[idx]
@@ -85,23 +132,24 @@ func handleTimeEntrySelection(client *harvest.Client) {
 	// Restart the time entry
 	restartedEntry, err := client.RestartTimeEntry(selectedEntry.ID)
 	if err != nil {
-		log.Fatalf("Failed to restart time entry: %v", err)
+		logger.Fatalf("Failed to restart time entry: %v", err)
+		os.Exit(1)
 	}
 
 	fmt.Printf("Restarted time entry %d for project %s task %s\n",
 		restartedEntry.ID, restartedEntry.Project.Name, restartedEntry.Task.Name)
 }
 
-func handleStatusDisplay(client *harvest.Client) {
-	// Get current user ID
-	userIDStr := os.Getenv("HARVEST_USER_ID")
+func handleStatusDisplay(client *harvest.Client, userIDStr string, logger *log.Logger, sketchyBarMode bool) {
 	if userIDStr == "" {
-		log.Fatalf("HARVEST_USER_ID environment variable must be set")
+		logger.Fatalf("User ID must be provided")
+		os.Exit(1)
 	}
 
 	userID, err := strconv.ParseInt(userIDStr, 10, 64)
 	if err != nil {
-		log.Fatalf("Invalid HARVEST_USER_ID: %v", err)
+		logger.Fatalf("Invalid user ID: %v", err)
+		os.Exit(1)
 	}
 
 	// Get today's date for filtering
@@ -110,7 +158,8 @@ func handleStatusDisplay(client *harvest.Client) {
 	// List time entries for today filtered by current user
 	entries, err := client.ListTimeEntries(&today, &today, &userID)
 	if err != nil {
-		log.Fatalf("Failed to list time entries: %v", err)
+		logger.Fatalf("Failed to list time entries: %v", err)
+		os.Exit(1)
 	}
 
 	// Find running entries
@@ -123,8 +172,12 @@ func handleStatusDisplay(client *harvest.Client) {
 	}
 
 	if runningEntry == nil {
-		// No running timer - show [xx:xx] in red (tmux compatible)
-		fmt.Print("#[fg=colour196][xx:xx]#[default]")
+		// No running timer - show [xx:xx] in red
+		if sketchyBarMode {
+			fmt.Printf("[xx:xx]\n")
+		} else {
+			fmt.Print("#[fg=colour196][xx:xx]#[default]")
+		}
 		return
 	}
 
@@ -153,26 +206,59 @@ func handleStatusDisplay(client *harvest.Client) {
 		}
 	}
 
-	// Display running timer with [HH:MM] format in green (tmux compatible)
-	fmt.Printf("#[fg=colour46][%02d:%02d]#[default]%s",
-		hours, minutes,
-		notesDisplay)
+	// Display running timer with [HH:MM] format in green
+	if sketchyBarMode {
+		fmt.Printf("[%02d:%02d]%s\n", hours, minutes, notesDisplay)
+	} else {
+		fmt.Printf("#[fg=colour46][%02d:%02d]#[default]%s",
+			hours, minutes, notesDisplay)
+	}
 }
 
 func main() {
+	// Setup logger
+	logger, err := config.SetupLogger()
+	if err != nil {
+		log.Fatalf("Failed to setup logger: %v", err)
+	}
+
 	var note string
 	var configPath string
 	var ignoreConfig bool
 	var selectEntry bool
 	var showStatus bool
+	var sketchyBarMode bool
 	flag.StringVar(&note, "n", "", "Initial notes text")
 	flag.StringVar(&configPath, "c", config.DefaultConfigPath(), "Config file path")
 	flag.BoolVar(&ignoreConfig, "i", false, "Ignore loading local configuration")
 	flag.BoolVar(&selectEntry, "e", false, "Select and restart an existing time entry")
 	flag.BoolVar(&showStatus, "s", false, "Show current running timer status")
+	flag.BoolVar(&sketchyBarMode, "b", false, "Format output for SketchyBar (must be used with -s)")
 	var ticket string
 	flag.StringVar(&ticket, "t", "", "External ticket number to prefix notes")
 	flag.Parse()
+
+	// Validate flags
+	if sketchyBarMode && !showStatus {
+		logger.Fatalf("-b flag must be used with -s flag")
+		os.Exit(1)
+	}
+
+	// Load global configuration
+	globalCfg, err := config.LoadGlobal()
+	if err != nil {
+		logger.Fatalf("Failed to load global config: %v", err)
+		os.Exit(1)
+	}
+
+	// Check if global config is complete, if not, prompt for setup
+	if globalCfg.HarvestAccountID == "" || globalCfg.HarvestAccessToken == "" || globalCfg.HarvestUserID == "" {
+		setupErr := setupGlobalConfig(globalCfg)
+		if setupErr != nil {
+			logger.Fatalf("Failed to setup global config: %v", setupErr)
+			os.Exit(1)
+		}
+	}
 
 	// Combine ticket with note if provided
 	if ticket != "" {
@@ -189,38 +275,41 @@ func main() {
 	}
 
 	var cfg *config.Config
-	var err error
+	var loadErr error
 	if !ignoreConfig {
-		cfg, err = config.Load(configPath)
+		cfg, loadErr = config.Load(configPath)
 	} else {
 		cfg = &config.Config{}
 	}
 
-	if err != nil {
-		log.Fatalf("Failed to load config: %v", err)
+	if loadErr != nil {
+		logger.Fatalf("Failed to load config: %v", loadErr)
+		os.Exit(1)
 	}
 
-	client, err := harvest.NewClient()
-	if err != nil {
-		log.Fatalf("Auth error: %v", err)
+	client, clientErr := harvest.NewClient(globalCfg.HarvestAccountID, globalCfg.HarvestAccessToken)
+	if clientErr != nil {
+		logger.Fatalf("Auth error: %v", clientErr)
+		os.Exit(1)
 	}
 
 	// Handle time entry selection mode
 	if selectEntry {
-		handleTimeEntrySelection(client)
+		handleTimeEntrySelection(client, globalCfg.HarvestUserID, logger)
 		return
 	}
 
 	// Handle status display mode
 	if showStatus {
-		handleStatusDisplay(client)
+		handleStatusDisplay(client, globalCfg.HarvestUserID, logger, sketchyBarMode)
 		return
 	}
 
 	// Projects selection
 	projects, err := client.ListProjects()
 	if err != nil {
-		log.Fatalf("Failed to list projects: %v", err)
+		logger.Fatalf("Failed to list projects: %v", err)
+		os.Exit(1)
 	}
 	projectOptions := make([]string, len(projects))
 	for i, p := range projects {
@@ -245,7 +334,8 @@ func main() {
 		var err error
 		idx, err := prompt.SelectPrompt(projectOptions, "Select a project:")
 		if err != nil {
-			log.Fatalf("prompt error: %v", err)
+			logger.Fatalf("prompt error: %v", err)
+			os.Exit(1)
 		}
 		selectedProjectID = projects[idx].ID
 	}
@@ -253,7 +343,8 @@ func main() {
 	// Tasks selection
 	tasks, err := client.ListTasks(selectedProjectID)
 	if err != nil {
-		log.Fatalf("Failed to list tasks: %v", err)
+		logger.Fatalf("Failed to list tasks: %v", err)
+		os.Exit(1)
 	}
 
 	taskOptions := make([]string, len(tasks))
@@ -278,7 +369,8 @@ func main() {
 		var err error
 		idx, err := prompt.SelectPrompt(taskOptions, "Select a task:")
 		if err != nil {
-			log.Fatalf("prompt error: %v", err)
+			logger.Fatalf("prompt error: %v", err)
+			os.Exit(1)
 		}
 		selectedTaskID = tasks[idx].ID
 	}
@@ -289,7 +381,8 @@ func main() {
 		var err error
 		notes, err = prompt.InputPrompt("Enter notes:", "")
 		if err != nil {
-			log.Fatalf("prompt error: %v", err)
+			logger.Fatalf("prompt error: %v", err)
+			os.Exit(1)
 		}
 	}
 
@@ -297,7 +390,8 @@ func main() {
 	req := harvest.TimeEntryRequest{ProjectID: selectedProjectID, TaskID: selectedTaskID, SpendDate: time.Now().Format(time.RFC3339), Notes: notes}
 	resp, err := client.CreateTimeEntry(req)
 	if err != nil {
-		log.Fatalf("Failed to create time entry: %v", err)
+		logger.Fatalf("Failed to create time entry: %v", err)
+		os.Exit(1)
 	}
 
 	fmt.Printf("Created time entry ID %d for project %s task %s\n", resp.ID, resp.Project.Name, resp.Task.Name)
@@ -307,7 +401,7 @@ func main() {
 	cfg.TaskID = selectedTaskID
 	if !ignoreConfig {
 		if err := cfg.Save(configPath); err != nil {
-			log.Printf("Failed to save config: %v", err)
+			logger.Printf("Failed to save config: %v", err)
 		}
 	}
 
