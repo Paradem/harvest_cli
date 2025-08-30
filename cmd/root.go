@@ -157,8 +157,19 @@ func handleTimeEntrySelection(client *harvest.Client, userIDStr string, logger *
 				notes = fmt.Sprintf("  \033[36m%s\033[0m", notes)
 			}
 		}
-		entryOptions[i] = fmt.Sprintf("%s - %s (%s) [%.2fh]%s",
-			entry.Project.Name, entry.Task.Name, status, entry.Hours, notes)
+
+		// Convert decimal hours to [HH:MM] format
+		totalHours := entry.Hours
+		hours := int(totalHours)
+		minutes := int(math.Ceil((totalHours - float64(hours)) * 60))
+		// Handle case where minutes rounds up to 60 (should increment hours)
+		if minutes >= 60 {
+			hours++
+			minutes = 0
+		}
+
+		entryOptions[i] = fmt.Sprintf("%s - %s (%s) [%02d:%02d]%s",
+			entry.Project.Name, entry.Task.Name, status, hours, minutes, notes)
 	}
 
 	// Show selection prompt

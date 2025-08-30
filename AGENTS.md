@@ -63,8 +63,9 @@ internal/
 #### Time Entry Display Formatting
 - **Project Selection**: `Project Name (Client Name)` with cyan client highlighting
 - **Task Selection**: Just task name (no ID)
-- **Time Entry List (-e)**: `Project - Task (Status) [Hours] Notes`
+- **Time Entry List (-e)**: `Project - Task (Status) [HH:MM] Notes`
   - Status: Green for running, Yellow for stopped
+  - Time: Hours and minutes format (e.g., [02:30] for 2.5 hours)
   - Notes: Cyan highlighting, truncated to 60 chars, newlines converted to `|`
 - **Status Display (-s)**: `[HH:MM] #first-word-of-notes` or `[xx:xx]` if no timer
 
