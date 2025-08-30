@@ -163,3 +163,18 @@ func (c *Client) RestartTimeEntry(timeEntryID int64) (*TimeEntry, error) {
 	}
 	return &res, nil
 }
+
+// StopTimeEntry stops a running time entry.
+func (c *Client) StopTimeEntry(timeEntryID int64) (*TimeEntry, error) {
+	path := fmt.Sprintf("/time_entries/%d/stop", timeEntryID)
+	req, err := c.newRequest("PATCH", path, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var res TimeEntry
+	if err := c.do(req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}

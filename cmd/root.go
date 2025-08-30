@@ -60,6 +60,53 @@ func setupGlobalConfig(cfg *config.Config) error {
 	return nil
 }
 
+func handleStopTimer(client *harvest.Client, userIDStr string, logger *log.Logger) {
+	if userIDStr == "" {
+		logger.Fatalf("User ID must be provided")
+		os.Exit(1)
+	}
+
+	userID, err := strconv.ParseInt(userIDStr, 10, 64)
+	if err != nil {
+		logger.Fatalf("Invalid user ID: %v", err)
+		os.Exit(1)
+	}
+
+	// Get today's date for filtering
+	today := time.Now().Format("2006-01-02")
+
+	// List time entries for today filtered by current user
+	entries, err := client.ListTimeEntries(&today, &today, &userID)
+	if err != nil {
+		logger.Fatalf("Failed to list time entries: %v", err)
+		os.Exit(1)
+	}
+
+	// Find running entries
+	var runningEntry *harvest.TimeEntry
+	for _, entry := range entries {
+		if entry.IsRunning {
+			runningEntry = &entry
+			break // Take the first running entry (there should typically be only one)
+		}
+	}
+
+	if runningEntry == nil {
+		fmt.Println("No running timer found to stop.")
+		return
+	}
+
+	// Stop the time entry
+	stoppedEntry, err := client.StopTimeEntry(runningEntry.ID)
+	if err != nil {
+		logger.Fatalf("Failed to stop time entry: %v", err)
+		os.Exit(1)
+	}
+
+	fmt.Printf("Stopped time entry %d for project %s task %s\n",
+		stoppedEntry.ID, stoppedEntry.Project.Name, stoppedEntry.Task.Name)
+}
+
 func handleTimeEntrySelection(client *harvest.Client, userIDStr string, logger *log.Logger) {
 	if userIDStr == "" {
 		logger.Fatalf("User ID must be provided")
@@ -228,12 +275,14 @@ func main() {
 	var selectEntry bool
 	var showStatus bool
 	var sketchyBarMode bool
+	var stopTimer bool
 	flag.StringVar(&note, "n", "", "Initial notes text")
 	flag.StringVar(&configPath, "c", config.DefaultConfigPath(), "Config file path")
 	flag.BoolVar(&ignoreConfig, "i", false, "Ignore loading local configuration")
 	flag.BoolVar(&selectEntry, "e", false, "Select and restart an existing time entry")
 	flag.BoolVar(&showStatus, "s", false, "Show current running timer status")
-	flag.BoolVar(&sketchyBarMode, "b", false, "Format output for SketchyBar (must be used with -s)")
+	flag.BoolVar(&sketchyBarMode, "b", false, "Format output for SketchyBar (plain text, must be used with -s)")
+	flag.BoolVar(&stopTimer, "q", false, "Stop the currently running timer")
 	var ticket string
 	flag.StringVar(&ticket, "t", "", "External ticket number to prefix notes")
 	flag.Parse()
@@ -291,6 +340,12 @@ func main() {
 	if clientErr != nil {
 		logger.Fatalf("Auth error: %v", clientErr)
 		os.Exit(1)
+	}
+
+	// Handle stop timer mode
+	if stopTimer {
+		handleStopTimer(client, globalCfg.HarvestUserID, logger)
+		return
 	}
 
 	// Handle time entry selection mode

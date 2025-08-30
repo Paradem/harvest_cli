@@ -28,9 +28,10 @@ No `.cursor` or `.cursorrules` directories found. No Copilot instructions presen
 - **`-c <config_path>`**: Specify custom config file path
 - **`-i`**: Ignore local configuration file
 - **`-t <ticket>`**: Add ticket number prefix (auto-adds # if missing)
-- **`-e`**: Select and restart existing time entries for today
+- **`-e`**: Select and restart an existing time entry for today
 - **`-s`**: Show current running timer status
 - **`-b`**: Format output for SketchyBar (plain text, must be used with `-s`)
+- **`-q`**: Stop the currently running timer
 
 #### Configuration
 The application now uses a global configuration file at `~/.config/harvest_cli/config.json` instead of environment variables. On first run, you'll be prompted to enter:
@@ -120,6 +121,7 @@ internal/
 ./harvest_cli -e                 # Select existing entry
 ./harvest_cli -s                 # Show status (tmux format)
 ./harvest_cli -s -b              # Show status (SketchyBar plain text format)
+./harvest_cli -q                 # Stop running timer
 ./harvest_cli -n "Working on feature"  # With notes
 ```
 
