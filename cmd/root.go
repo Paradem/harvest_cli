@@ -230,11 +230,29 @@ func handleStatusDisplay(client *harvest.Client, userIDStr string, logger *log.L
 	}
 
 	if runningEntry == nil {
-		// No running timer - show [xx:xx] in red
+		// No running timer - show total billable hours for today
+		var totalBillableHours float64
+		for _, entry := range entries {
+			if entry.Billable {
+				totalBillableHours += entry.Hours
+			}
+		}
+
+		// Convert decimal hours to [HH:MM] format
+		hours := int(totalBillableHours)
+		minutes := int(math.Ceil((totalBillableHours - float64(hours)) * 60))
+
+		// Handle case where minutes rounds up to 60 (should increment hours)
+		if minutes >= 60 {
+			hours++
+			minutes = 0
+		}
+
+		// Display total billable hours with [HH:MM] format in green (same as running timer)
 		if sketchyBarMode {
-			fmt.Printf("[xx:xx]\n")
+			fmt.Printf("[%02d:%02d] paused\n", hours, minutes)
 		} else {
-			fmt.Print("#[fg=colour196][xx:xx]#[default]")
+			fmt.Printf("#[fg=colour46][%02d:%02d]#[default] paused", hours, minutes)
 		}
 		return
 	}
