@@ -5,6 +5,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -106,49 +107,50 @@ func SelectPrompt(options []string, message string) (int, error) {
 
 // ---------- INPUT MODEL ----------
 type inputModel struct {
-	quit     bool
-	cursor   int
-	input    string
-	message  string
-	accepted bool
+	textInput textinput.Model
+	message   string
+	quit      bool
 }
 
-func (m *inputModel) Init() tea.Cmd { return nil }
+func (m *inputModel) Init() tea.Cmd {
+	return textinput.Blink
+}
 
 func (m *inputModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
+
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		switch msg.String() {
-		case "enter":
-			m.accepted = true
+		switch msg.Type {
+		case tea.KeyEnter:
 			return m, tea.Quit
-		case "ctrl+c":
+		case tea.KeyCtrlC:
 			m.quit = true
 			return m, tea.Quit
-		case "backspace":
-			if len(m.input) > 0 {
-				m.input = m.input[:len(m.input)-1]
-			}
-		case " ":
-			// Explicitly handle space character
-			m.input += " "
-		default:
-			if msg.Type == tea.KeyRunes {
-				m.input += string(msg.Runes)
-			}
 		}
 	}
-	return m, nil
+
+	m.textInput, cmd = m.textInput.Update(msg)
+	return m, cmd
 }
 
 func (m *inputModel) View() string {
-	prompt := fmt.Sprintf("%s\n> %s", m.message, m.input)
-	return prompt
+	return fmt.Sprintf("%s\n%s", m.message, m.textInput.View())
 }
 
 // InputPrompt asks the user for a single line of text.
 func InputPrompt(message string, defaultText string) (string, error) {
-	m := inputModel{quit: false, message: message, input: defaultText}
+	ti := textinput.New()
+	ti.Placeholder = ""
+	ti.Focus()
+	ti.SetValue(defaultText)
+
+	m := inputModel{
+		textInput: ti,
+		message:   message,
+		quit:      false,
+	}
+
 	p := tea.NewProgram(&m)
 	if _, err := p.Run(); err != nil {
 		return "", err
@@ -158,5 +160,5 @@ func InputPrompt(message string, defaultText string) (string, error) {
 		os.Exit(0)
 	}
 
-	return m.input, nil
+	return m.textInput.Value(), nil
 }
