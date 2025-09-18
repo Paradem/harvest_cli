@@ -291,6 +291,68 @@ func handleStatusDisplay(client *harvest.Client, userIDStr string, logger *log.L
 	}
 }
 
+func handleAddTime(client *harvest.Client, userIDStr string, logger *log.Logger, minutesToAdd int) {
+	if userIDStr == "" {
+		logger.Fatalf("User ID must be provided")
+		os.Exit(1)
+	}
+
+	userID, err := strconv.ParseInt(userIDStr, 10, 64)
+	if err != nil {
+		logger.Fatalf("Invalid user ID: %v", err)
+		os.Exit(1)
+	}
+
+	// Get today's date for filtering
+	today := time.Now().Format("2006-01-02")
+
+	// List time entries for today filtered by current user
+	entries, err := client.ListTimeEntries(&today, &today, &userID)
+	if err != nil {
+		logger.Fatalf("Failed to list time entries: %v", err)
+		os.Exit(1)
+	}
+
+	// Find running entries
+	var runningEntry *harvest.TimeEntry
+	for _, entry := range entries {
+		if entry.IsRunning {
+			runningEntry = &entry
+			break // Take the first running entry (there should typically be only one)
+		}
+	}
+
+	if runningEntry == nil {
+		fmt.Println("No running timer found to add time to.")
+		return
+	}
+
+	// Calculate new total hours
+	additionalHours := float64(minutesToAdd) / 60.0
+	newTotalHours := runningEntry.Hours + additionalHours
+
+	// Update the time entry with new hours
+	updatedEntry, err := client.UpdateTimeEntry(runningEntry.ID, newTotalHours)
+	if err != nil {
+		logger.Fatalf("Failed to update time entry: %v", err)
+		os.Exit(1)
+	}
+
+	// Convert new total to [HH:MM] format for display
+	totalHours := updatedEntry.Hours
+	hours := int(totalHours)
+	minutes := int(math.Ceil((totalHours - float64(hours)) * 60))
+
+	// Handle case where minutes rounds up to 60 (should increment hours)
+	if minutes >= 60 {
+		hours++
+		minutes = 0
+	}
+
+	fmt.Printf("Added %d minutes to running timer. New total: [%02d:%02d] for project %s task %s\n",
+		minutesToAdd, hours, minutes, updatedEntry.Project.Name, updatedEntry.Task.Name)
+}
+
 func main() {
 	// Setup logger
 	logger, err := config.SetupLogger()
@@ -305,6 +367,7 @@ func main() {
 	var showStatus bool
 	var sketchyBarMode bool
 	var stopTimer bool
+	var addMinutes int
 	flag.StringVar(&note, "n", "", "Initial notes text")
 	flag.StringVar(&configPath, "c", config.DefaultConfigPath(), "Config file path")
 	flag.BoolVar(&ignoreConfig, "i", false, "Ignore loading local configuration")
@@ -312,6 +375,7 @@ func main() {
 	flag.BoolVar(&showStatus, "s", false, "Show current running timer status")
 	flag.BoolVar(&sketchyBarMode, "b", false, "Format output for SketchyBar (plain text, must be used with -s)")
 	flag.BoolVar(&stopTimer, "q", false, "Stop the currently running timer")
+	flag.IntVar(&addMinutes, "a", 0, "Add minutes to current running timer")
 	var ticket string
 	flag.StringVar(&ticket, "t", "", "External ticket number to prefix notes")
 	flag.Parse()
@@ -319,6 +383,18 @@ func main() {
 	// Validate flags
 	if sketchyBarMode && !showStatus {
 		logger.Fatalf("-b flag must be used with -s flag")
+		os.Exit(1)
+	}
+
+	// Validate add minutes flag
+	if addMinutes < 0 {
+		logger.Fatalf("-a flag must be a positive number of minutes")
+		os.Exit(1)
+	}
+
+	// Check for conflicting flags with -a
+	if addMinutes > 0 && (selectEntry || showStatus || stopTimer) {
+		logger.Fatalf("-a flag cannot be used with -e, -s, or -q flags")
 		os.Exit(1)
 	}
 
@@ -386,6 +462,12 @@ func main() {
 	// Handle status display mode
 	if showStatus {
 		handleStatusDisplay(client, globalCfg.HarvestUserID, logger, sketchyBarMode)
+		return
+	}
+
+	// Handle add time mode
+	if addMinutes > 0 {
+		handleAddTime(client, globalCfg.HarvestUserID, logger, addMinutes)
 		return
 	}
 

@@ -30,6 +30,11 @@ type TimeEntryRequest struct {
 	Notes     string `json:"notes"`
 }
 
+// TimeEntryUpdateRequest is the payload for updating a time entry.
+type TimeEntryUpdateRequest struct {
+	Hours float64 `json:"hours"`
+}
+
 // TimeEntryResponse represents the API response for a created time entry.
 type TimeEntryResponse struct {
 	ID        int64   `json:"id"`

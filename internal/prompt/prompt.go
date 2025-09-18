@@ -129,6 +129,9 @@ func (m *inputModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if len(m.input) > 0 {
 				m.input = m.input[:len(m.input)-1]
 			}
+		case " ":
+			// Explicitly handle space character
+			m.input += " "
 		default:
 			if msg.Type == tea.KeyRunes {
 				m.input += string(msg.Runes)

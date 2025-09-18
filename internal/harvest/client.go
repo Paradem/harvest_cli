@@ -178,3 +178,19 @@ func (c *Client) StopTimeEntry(timeEntryID int64) (*TimeEntry, error) {
 	}
 	return &res, nil
 }
+
+// UpdateTimeEntry updates a time entry with new hours.
+func (c *Client) UpdateTimeEntry(timeEntryID int64, hours float64) (*TimeEntry, error) {
+	path := fmt.Sprintf("/time_entries/%d", timeEntryID)
+	updateReq := TimeEntryUpdateRequest{Hours: hours}
+	req, err := c.newRequest("PATCH", path, updateReq)
+	if err != nil {
+		return nil, err
+	}
+
+	var res TimeEntry
+	if err := c.do(req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
