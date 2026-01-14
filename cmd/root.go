@@ -377,6 +377,7 @@ func main() {
 	var waybarMode bool
 	var stopTimer bool
 	var addMinutes int
+	var lazyProjectSelect bool
 	flag.StringVar(&note, "n", "", "Initial notes text")
 	flag.StringVar(&configPath, "c", config.DefaultConfigPath(), "Config file path")
 	flag.BoolVar(&ignoreConfig, "i", false, "Ignore loading local configuration")
@@ -386,6 +387,7 @@ func main() {
 	flag.BoolVar(&waybarMode, "w", false, "Format output for Waybar (JSON format, must be used with -s)")
 	flag.BoolVar(&stopTimer, "q", false, "Stop the currently running timer")
 	flag.IntVar(&addMinutes, "a", 0, "Add minutes to current running timer")
+	flag.BoolVar(&lazyProjectSelect, "l", false, "Lazy project selection (hide list until typing)")
 	var ticket string
 	flag.StringVar(&ticket, "t", "", "External ticket number to prefix notes")
 	flag.Parse()
@@ -516,7 +518,7 @@ func main() {
 	}
 	if selectedProjectID == 0 {
 		var err error
-		idx, err := prompt.SelectPrompt(projectOptions, "Select a project:")
+		idx, err := prompt.SelectPromptWithOptions(projectOptions, "Select a project:", lazyProjectSelect)
 		if err != nil {
 			logger.Fatalf("prompt error: %v", err)
 			os.Exit(1)

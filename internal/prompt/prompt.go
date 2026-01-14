@@ -11,12 +11,16 @@ import (
 
 // ---------- SELECT MODEL ----------
 type selectModel struct {
-	filter   string
-	cursor   int
-	quit     bool
-	options  []string
-	filtered []string
-	message  string
+	filter      string
+	cursor      int
+	quit        bool
+	options     []string
+	filtered    []string
+	message     string
+	lazyMode    bool
+	hasTyped    bool
+	offset      int
+	maxVisible  int
 }
 
 func FilterBySubstring(src []string, needle string) []string {
@@ -40,14 +44,25 @@ func (m *selectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "up", "ctrl+k":
+			if m.lazyMode && !m.hasTyped {
+				break
+			}
 			if m.cursor > 0 {
 				m.cursor--
+				m.adjustOffset()
 			}
 		case "down", "ctrl+j":
+			if m.lazyMode && !m.hasTyped {
+				break
+			}
 			if m.cursor < len(m.filtered)-1 {
 				m.cursor++
+				m.adjustOffset()
 			}
 		case "enter":
+			if m.lazyMode && !m.hasTyped {
+				break
+			}
 			return m, tea.Quit
 		case "ctrl+c":
 			m.quit = true
@@ -56,28 +71,69 @@ func (m *selectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			runes := []rune(m.filter)
 			if len(runes) > 0 {
 				m.filter = string(runes[:len(runes)-1])
+				if m.lazyMode {
+					m.hasTyped = len(m.filter) > 0
+				}
+				m.cursor = 0
+				m.offset = 0
 			}
 		default:
 			if msg.Type == tea.KeyRunes {
 				m.cursor = 0
 				m.filter += string(msg.Runes)
+				if m.lazyMode {
+					m.hasTyped = true
+				}
+				m.offset = 0
 			}
 		}
 	}
-	m.filtered = FilterBySubstring(m.options, m.filter)
+	if !m.lazyMode || m.hasTyped {
+		m.filtered = FilterBySubstring(m.options, m.filter)
+	} else {
+		m.filtered = []string{}
+	}
 
 	return m, nil
 }
 
+func (m *selectModel) adjustOffset() {
+	if m.cursor < m.offset {
+		m.offset = m.cursor
+	} else if m.cursor >= m.offset+m.maxVisible {
+		m.offset = m.cursor - m.maxVisible + 1
+	}
+}
+
 func (m *selectModel) View() string {
 	s := fmt.Sprintf("%s\n", m.message)
-	s += fmt.Sprintf("filtering by: %s\n", m.filter)
-	for i, o := range m.filtered {
-		prefix := "  "
-		if i == m.cursor {
-			prefix = "➜ "
+	if m.lazyMode && !m.hasTyped {
+		s += "Start typing to search...\n"
+	} else {
+		s += fmt.Sprintf("filtering by: %s\n", m.filter)
+		
+		// Determine which items to display
+		start := m.offset
+		end := start + m.maxVisible
+		if end > len(m.filtered) {
+			end = len(m.filtered)
 		}
-		s += fmt.Sprintf("%s %s\n", prefix, o)
+		
+		// Display visible items
+		for i := start; i < end; i++ {
+			o := m.filtered[i]
+			prefix := "  "
+			if i == m.cursor {
+				prefix = "➜ "
+			}
+			s += fmt.Sprintf("%s %s\n", prefix, o)
+		}
+		
+		// Show scroll indicator if there are more items
+		if len(m.filtered) > m.maxVisible {
+			scrollInfo := fmt.Sprintf("(%d-%d/%d)", start+1, end, len(m.filtered))
+			s += fmt.Sprintf("  ...%s\n", scrollInfo)
+		}
 	}
 	return s
 }
@@ -92,7 +148,25 @@ func IndexOf(arr []string, target string) int {
 }
 
 func SelectPrompt(options []string, message string) (int, error) {
-	m := selectModel{quit: false, options: options, message: message, filtered: options, filter: ""}
+	return SelectPromptWithOptions(options, message, false)
+}
+
+func SelectPromptWithOptions(options []string, message string, lazyMode bool) (int, error) {
+	return SelectPromptWithVisibleLimit(options, message, lazyMode, 15) // Default 15 visible items
+}
+
+func SelectPromptWithVisibleLimit(options []string, message string, lazyMode bool, maxVisible int) (int, error) {
+	m := selectModel{
+		quit:        false, 
+		options:     options, 
+		message:     message, 
+		filtered:    options, 
+		filter:      "", 
+		lazyMode:    lazyMode, 
+		hasTyped:    false,
+		offset:      0,
+		maxVisible:  maxVisible,
+	}
 	p := tea.NewProgram(&m)
 	if _, err := p.Run(); err != nil {
 		return -1, err
