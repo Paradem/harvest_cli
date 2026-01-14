@@ -198,7 +198,7 @@ func handleTimeEntrySelection(client *harvest.Client, userIDStr string, logger *
 		restartedEntry.ID, restartedEntry.Project.Name, restartedEntry.Task.Name)
 }
 
-func handleStatusDisplay(client *harvest.Client, userIDStr string, logger *log.Logger, sketchyBarMode bool) {
+func handleStatusDisplay(client *harvest.Client, userIDStr string, logger *log.Logger, sketchyBarMode bool, waybarMode bool) {
 	if userIDStr == "" {
 		logger.Fatalf("User ID must be provided")
 		os.Exit(1)
@@ -248,9 +248,11 @@ func handleStatusDisplay(client *harvest.Client, userIDStr string, logger *log.L
 			minutes = 0
 		}
 
-		// Display total billable hours with [HH:MM] format in green (same as running timer)
+		// Display total billable hours with [HH:MM] format
 		if sketchyBarMode {
 			fmt.Printf("[%02d:%02d] paused\n", hours, minutes)
+		} else if waybarMode {
+			fmt.Printf("{\"text\":\"<span color='#ff0000'>[%02d:%02d]</span> paused\",\"class\":\"paused\"}\n", hours, minutes)
 		} else {
 			fmt.Printf("#[fg=colour46][%02d:%02d]#[default] paused", hours, minutes)
 		}
@@ -282,9 +284,15 @@ func handleStatusDisplay(client *harvest.Client, userIDStr string, logger *log.L
 		}
 	}
 
-	// Display running timer with [HH:MM] format in green
+	// Display running timer with [HH:MM] format
 	if sketchyBarMode {
 		fmt.Printf("[%02d:%02d]%s\n", hours, minutes, notesDisplay)
+	} else if waybarMode {
+		notesText := ""
+		if notesDisplay != "" {
+			notesText = fmt.Sprintf(" <span color='#ffffff'>%s</span>", notesDisplay[1:]) // Remove leading space
+		}
+		fmt.Printf("{\"text\":\"<span color='#00ff00'>[%02d:%02d]</span>%s\",\"class\":\"running\"}\n", hours, minutes, notesText)
 	} else {
 		fmt.Printf("#[fg=colour46][%02d:%02d]#[default]%s",
 			hours, minutes, notesDisplay)
@@ -366,6 +374,7 @@ func main() {
 	var selectEntry bool
 	var showStatus bool
 	var sketchyBarMode bool
+	var waybarMode bool
 	var stopTimer bool
 	var addMinutes int
 	flag.StringVar(&note, "n", "", "Initial notes text")
@@ -374,6 +383,7 @@ func main() {
 	flag.BoolVar(&selectEntry, "e", false, "Select and restart an existing time entry")
 	flag.BoolVar(&showStatus, "s", false, "Show current running timer status")
 	flag.BoolVar(&sketchyBarMode, "b", false, "Format output for SketchyBar (plain text, must be used with -s)")
+	flag.BoolVar(&waybarMode, "w", false, "Format output for Waybar (JSON format, must be used with -s)")
 	flag.BoolVar(&stopTimer, "q", false, "Stop the currently running timer")
 	flag.IntVar(&addMinutes, "a", 0, "Add minutes to current running timer")
 	var ticket string
@@ -383,6 +393,14 @@ func main() {
 	// Validate flags
 	if sketchyBarMode && !showStatus {
 		logger.Fatalf("-b flag must be used with -s flag")
+		os.Exit(1)
+	}
+	if waybarMode && !showStatus {
+		logger.Fatalf("-w flag must be used with -s flag")
+		os.Exit(1)
+	}
+	if sketchyBarMode && waybarMode {
+		logger.Fatalf("-b and -w flags cannot be used together")
 		os.Exit(1)
 	}
 
@@ -461,7 +479,7 @@ func main() {
 
 	// Handle status display mode
 	if showStatus {
-		handleStatusDisplay(client, globalCfg.HarvestUserID, logger, sketchyBarMode)
+		handleStatusDisplay(client, globalCfg.HarvestUserID, logger, sketchyBarMode, waybarMode)
 		return
 	}
 
