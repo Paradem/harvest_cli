@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
@@ -361,6 +362,102 @@ func handleAddTime(client *harvest.Client, userIDStr string, logger *log.Logger,
 		minutesToAdd, hours, minutes, updatedEntry.Project.Name, updatedEntry.Task.Name)
 }
 
+func handleInvoiceList(client *harvest.Client, logger *log.Logger, from, to *string, jsonOutput bool) {
+	invoices, err := client.ListInvoices(from, to)
+	if err != nil {
+		logger.Fatalf("Failed to list invoices: %v", err)
+		os.Exit(1)
+	}
+
+	if jsonOutput {
+		out, err := jsonMarshal(invoices)
+		if err != nil {
+			logger.Fatalf("Failed to marshal invoices: %v", err)
+			os.Exit(1)
+		}
+		fmt.Println(string(out))
+		return
+	}
+
+	if len(invoices) == 0 {
+		fmt.Println("No invoices found.")
+		return
+	}
+
+	fmt.Printf("%-12s %-12s %12s %-10s %s\n", "DATE", "NUMBER", "AMOUNT", "STATUS", "CLIENT")
+	fmt.Println(strings.Repeat("-", 80))
+	for _, inv := range invoices {
+		issuedDate := inv.IssuedAt
+		if issuedDate == "" {
+			issuedDate = inv.CreatedAt
+		}
+		if len(issuedDate) > 10 {
+			issuedDate = issuedDate[:10]
+		}
+		amount := fmt.Sprintf("$%.2f", inv.Amount)
+		clientName := inv.Client.Name
+		if len(clientName) > 30 {
+			clientName = clientName[:27] + "..."
+		}
+		fmt.Printf("%-12s %-12s %12s %-10s %s\n",
+			issuedDate, inv.Number, amount, inv.Status, clientName)
+	}
+}
+
+func handleExpenseList(client *harvest.Client, logger *log.Logger, from, to *string, jsonOutput bool) {
+	expenses, err := client.ListExpenses(from, to)
+	if err != nil {
+		logger.Fatalf("Failed to list expenses: %v", err)
+		os.Exit(1)
+	}
+
+	if jsonOutput {
+		out, err := jsonMarshal(expenses)
+		if err != nil {
+			logger.Fatalf("Failed to marshal expenses: %v", err)
+			os.Exit(1)
+		}
+		fmt.Println(string(out))
+		return
+	}
+
+	if len(expenses) == 0 {
+		fmt.Println("No expenses found.")
+		return
+	}
+
+	fmt.Printf("%-12s %-25s %-16s %10s %s\n", "DATE", "PROJECT", "CATEGORY", "AMOUNT", "NOTES")
+	fmt.Println(strings.Repeat("-", 80))
+	for _, exp := range expenses {
+		spentDate := exp.SpentDate
+		if len(spentDate) > 10 {
+			spentDate = spentDate[:10]
+		}
+		amount := fmt.Sprintf("$%.2f", exp.TotalCost)
+		projectName := exp.Project.Name
+		if len(projectName) > 23 {
+			projectName = projectName[:20] + "..."
+		}
+		categoryName := exp.ExpenseCategory.Name
+		if len(categoryName) > 14 {
+			categoryName = categoryName[:11] + "..."
+		}
+		notes := ""
+		if exp.Notes != nil {
+			notes = *exp.Notes
+			if len(notes) > 30 {
+				notes = notes[:27] + "..."
+			}
+		}
+		fmt.Printf("%-12s %-25s %-16s %10s %s\n",
+			spentDate, projectName, categoryName, amount, notes)
+	}
+}
+
+func jsonMarshal(v interface{}) ([]byte, error) {
+	return json.MarshalIndent(v, "", "  ")
+}
+
 func main() {
 	// Setup logger
 	logger, err := config.SetupLogger()
@@ -378,6 +475,11 @@ func main() {
 	var stopTimer bool
 	var addMinutes int
 	var lazyProjectSelect bool
+	var listInvoices bool
+	var listExpenses bool
+	var fromDate string
+	var toDate string
+	var jsonOutput bool
 	flag.StringVar(&note, "n", "", "Initial notes text")
 	flag.StringVar(&configPath, "c", config.DefaultConfigPath(), "Config file path")
 	flag.BoolVar(&ignoreConfig, "i", false, "Ignore loading local configuration")
@@ -388,6 +490,11 @@ func main() {
 	flag.BoolVar(&stopTimer, "q", false, "Stop the currently running timer")
 	flag.IntVar(&addMinutes, "a", 0, "Add minutes to current running timer")
 	flag.BoolVar(&lazyProjectSelect, "l", false, "Lazy project selection (hide list until typing)")
+	flag.BoolVar(&listInvoices, "I", false, "List recent invoices")
+	flag.BoolVar(&listExpenses, "E", false, "List expenses")
+	flag.StringVar(&fromDate, "from", "", "From date (YYYY-MM-DD)")
+	flag.StringVar(&toDate, "to", "", "To date (YYYY-MM-DD)")
+	flag.BoolVar(&jsonOutput, "json", false, "Output as raw JSON")
 	var ticket string
 	flag.StringVar(&ticket, "t", "", "External ticket number to prefix notes")
 	flag.Parse()
@@ -488,6 +595,32 @@ func main() {
 	// Handle add time mode
 	if addMinutes > 0 {
 		handleAddTime(client, globalCfg.HarvestUserID, logger, addMinutes)
+		return
+	}
+
+	// Handle invoice listing
+	if listInvoices {
+		var from, to *string
+		if fromDate != "" {
+			from = &fromDate
+		}
+		if toDate != "" {
+			to = &toDate
+		}
+		handleInvoiceList(client, logger, from, to, jsonOutput)
+		return
+	}
+
+	// Handle expense listing
+	if listExpenses {
+		var from, to *string
+		if fromDate != "" {
+			from = &fromDate
+		}
+		if toDate != "" {
+			to = &toDate
+		}
+		handleExpenseList(client, logger, from, to, jsonOutput)
 		return
 	}
 

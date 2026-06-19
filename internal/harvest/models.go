@@ -114,3 +114,46 @@ type ExternalReference struct {
 	Service        string `json:"service"`
 	ServiceIconURL string `json:"service_icon_url"`
 }
+
+type InvoiceDetail struct {
+	ID        int64         `json:"id"`
+	Number    string        `json:"number"`
+	Amount    float64       `json:"amount"`
+	Status    string        `json:"state"`
+	IssuedAt  string        `json:"issued_at"`
+	DueAt     *string       `json:"due_at"`
+	Client    HarvestClient `json:"client"`
+	CreatedAt string        `json:"created_at"`
+	UpdatedAt string        `json:"updated_at"`
+}
+
+type InvoiceListResponse struct {
+	Invoices   []InvoiceDetail `json:"invoices"`
+	PerPage    int             `json:"per_page"`
+	TotalPages int             `json:"total_pages"`
+	NextPage   *int            `json:"next_page"`
+}
+
+type ExpenseDetail struct {
+	ID              int64           `json:"id"`
+	SpentDate       string          `json:"spent_date"`
+	Project         Project         `json:"project"`
+	ExpenseCategory ExpenseCategory `json:"expense_category"`
+	TotalCost       float64         `json:"total_cost"`
+	Notes           *string         `json:"notes"`
+	Billable        bool            `json:"billable"`
+	CreatedAt       string          `json:"created_at"`
+	UpdatedAt       string          `json:"updated_at"`
+}
+
+type ExpenseCategory struct {
+	ID   int64  `json:"id"`
+	Name string `json:"name"`
+}
+
+type ExpenseListResponse struct {
+	Expenses   []ExpenseDetail `json:"expenses"`
+	PerPage    int             `json:"per_page"`
+	TotalPages int             `json:"total_pages"`
+	NextPage   *int            `json:"next_page"`
+}

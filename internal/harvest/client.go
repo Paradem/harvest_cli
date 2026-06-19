@@ -194,3 +194,49 @@ func (c *Client) UpdateTimeEntry(timeEntryID int64, hours float64) (*TimeEntry, 
 	}
 	return &res, nil
 }
+
+func (c *Client) ListInvoices(from, to *string) ([]InvoiceDetail, error) {
+	path := "/invoices?per_page=100"
+	if from != nil {
+		path += "&from=" + *from
+	}
+	if to != nil {
+		path += "&to=" + *to
+	}
+
+	req, err := c.newRequest("GET", path, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var res InvoiceListResponse
+	if err := c.do(req, &res); err != nil {
+		return nil, err
+	}
+	return res.Invoices, nil
+}
+
+func (c *Client) ListExpenses(from, to *string) ([]ExpenseDetail, error) {
+	path := "/expenses"
+	params := make([]string, 0, 2)
+	if from != nil {
+		params = append(params, "from="+*from)
+	}
+	if to != nil {
+		params = append(params, "to="+*to)
+	}
+	if len(params) > 0 {
+		path += "?" + strings.Join(params, "&")
+	}
+
+	req, err := c.newRequest("GET", path, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var res ExpenseListResponse
+	if err := c.do(req, &res); err != nil {
+		return nil, err
+	}
+	return res.Expenses, nil
+}
