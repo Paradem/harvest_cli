@@ -5,7 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
+	"os"
+	"path/filepath"
+	"strconv"
 	"strings"
 )
 
@@ -259,6 +263,53 @@ func (c *Client) CreateExpense(reqBody ExpenseCreateRequest) (*ExpenseDetail, er
 	if err != nil {
 		return nil, err
 	}
+
+	var res ExpenseDetail
+	if err := c.do(req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *Client) CreateExpenseWithReceipt(reqBody ExpenseCreateRequest, receiptPath string) (*ExpenseDetail, error) {
+	var buf bytes.Buffer
+	writer := multipart.NewWriter(&buf)
+
+	writer.WriteField("project_id", strconv.FormatInt(reqBody.ProjectID, 10))
+	writer.WriteField("expense_category_id", strconv.FormatInt(reqBody.ExpenseCategoryID, 10))
+	writer.WriteField("spent_date", reqBody.SpentDate)
+	writer.WriteField("total_cost", strconv.FormatFloat(reqBody.TotalCost, 'f', 2, 64))
+	if reqBody.Notes != nil {
+		writer.WriteField("notes", *reqBody.Notes)
+	}
+	if reqBody.Billable != nil {
+		if *reqBody.Billable {
+			writer.WriteField("billable", "true")
+		} else {
+			writer.WriteField("billable", "false")
+		}
+	}
+
+	file, err := os.Open(receiptPath)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+	part, err := writer.CreateFormFile("receipt", filepath.Base(receiptPath))
+	if err != nil {
+		return nil, err
+	}
+	io.Copy(part, file)
+	writer.Close()
+
+	url := baseURL + "/expenses"
+	req, err := http.NewRequest("POST", url, &buf)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+c.token)
+	req.Header.Set("Harvest-Account-ID", c.accountID)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
 
 	var res ExpenseDetail
 	if err := c.do(req, &res); err != nil {

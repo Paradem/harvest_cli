@@ -7,6 +7,7 @@ import (
 	"log"
 	"math"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -454,7 +455,7 @@ func handleExpenseList(client *harvest.Client, logger *log.Logger, from, to *str
 	}
 }
 
-func handleExpenseCreate(client *harvest.Client, userIDStr string, logger *log.Logger, projectIDStr, categoryIDStr, amountStr, dateStr, notes string) {
+func handleExpenseCreate(client *harvest.Client, userIDStr string, logger *log.Logger, projectIDStr, categoryIDStr, amountStr, dateStr, notes, receiptPath string) {
 	if dateStr == "" {
 		dateStr = time.Now().Format("2006-01-02")
 	}
@@ -487,13 +488,27 @@ func handleExpenseCreate(client *harvest.Client, userIDStr string, logger *log.L
 			req.Notes = &notes
 		}
 
-		exp, err := client.CreateExpense(req)
-		if err != nil {
-			logger.Fatalf("Failed to create expense: %v", err)
-			os.Exit(1)
+		if receiptPath != "" {
+			if _, err := os.Stat(receiptPath); os.IsNotExist(err) {
+				logger.Fatalf("Receipt file not found: %s", receiptPath)
+				os.Exit(1)
+			}
+			exp, err := client.CreateExpenseWithReceipt(req, receiptPath)
+			if err != nil {
+				logger.Fatalf("Failed to create expense: %v", err)
+				os.Exit(1)
+			}
+			fmt.Printf("Created expense #%d: $%.2f - %s (%s) [%s] (receipt: %s)\n",
+				exp.ID, exp.TotalCost, exp.ExpenseCategory.Name, exp.Project.Name, exp.SpentDate, filepath.Base(receiptPath))
+		} else {
+			exp, err := client.CreateExpense(req)
+			if err != nil {
+				logger.Fatalf("Failed to create expense: %v", err)
+				os.Exit(1)
+			}
+			fmt.Printf("Created expense #%d: $%.2f - %s (%s) [%s]\n",
+				exp.ID, exp.TotalCost, exp.ExpenseCategory.Name, exp.Project.Name, exp.SpentDate)
 		}
-		fmt.Printf("Created expense #%d: $%.2f - %s (%s) [%s]\n",
-			exp.ID, exp.TotalCost, exp.ExpenseCategory.Name, exp.Project.Name, exp.SpentDate)
 		return
 	}
 
@@ -565,13 +580,27 @@ func handleExpenseCreate(client *harvest.Client, userIDStr string, logger *log.L
 		req.Notes = &expenseNotes
 	}
 
-	exp, err := client.CreateExpense(req)
-	if err != nil {
-		logger.Fatalf("Failed to create expense: %v", err)
-		os.Exit(1)
+	if receiptPath != "" {
+		if _, err := os.Stat(receiptPath); os.IsNotExist(err) {
+			logger.Fatalf("Receipt file not found: %s", receiptPath)
+			os.Exit(1)
+		}
+		exp, err := client.CreateExpenseWithReceipt(req, receiptPath)
+		if err != nil {
+			logger.Fatalf("Failed to create expense: %v", err)
+			os.Exit(1)
+		}
+		fmt.Printf("Created expense #%d: $%.2f - %s (%s) [%s] (receipt: %s)\n",
+			exp.ID, exp.TotalCost, exp.ExpenseCategory.Name, exp.Project.Name, exp.SpentDate, filepath.Base(receiptPath))
+	} else {
+		exp, err := client.CreateExpense(req)
+		if err != nil {
+			logger.Fatalf("Failed to create expense: %v", err)
+			os.Exit(1)
+		}
+		fmt.Printf("Created expense #%d: $%.2f - %s (%s) [%s]\n",
+			exp.ID, exp.TotalCost, exp.ExpenseCategory.Name, exp.Project.Name, exp.SpentDate)
 	}
-	fmt.Printf("Created expense #%d: $%.2f - %s (%s) [%s]\n",
-		exp.ID, exp.TotalCost, exp.ExpenseCategory.Name, exp.Project.Name, exp.SpentDate)
 }
 
 func jsonMarshal(v interface{}) ([]byte, error) {
@@ -625,6 +654,8 @@ func main() {
 	flag.StringVar(&expenseCategoryID, "category-id", "", "Expense category ID")
 	flag.StringVar(&expenseAmount, "amount", "", "Expense total cost")
 	flag.StringVar(&expenseDate, "date", "", "Expense date (YYYY-MM-DD, default: today)")
+	var receiptPath string
+	flag.StringVar(&receiptPath, "receipt", "", "Path to receipt file (PDF/image)")
 	var ticket string
 	flag.StringVar(&ticket, "t", "", "External ticket number to prefix notes")
 	flag.Parse()
@@ -750,7 +781,7 @@ func main() {
 	// Handle expense listing / creation
 	if listExpenses {
 		if createExpense {
-			handleExpenseCreate(client, globalCfg.HarvestUserID, logger, expenseProjectID, expenseCategoryID, expenseAmount, expenseDate, note)
+			handleExpenseCreate(client, globalCfg.HarvestUserID, logger, expenseProjectID, expenseCategoryID, expenseAmount, expenseDate, note, receiptPath)
 			return
 		}
 		var from, to *string
