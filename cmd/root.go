@@ -454,6 +454,126 @@ func handleExpenseList(client *harvest.Client, logger *log.Logger, from, to *str
 	}
 }
 
+func handleExpenseCreate(client *harvest.Client, userIDStr string, logger *log.Logger, projectIDStr, categoryIDStr, amountStr, dateStr, notes string) {
+	if dateStr == "" {
+		dateStr = time.Now().Format("2006-01-02")
+	}
+
+	// Non-interactive mode: all required fields provided
+	if projectIDStr != "" && categoryIDStr != "" && amountStr != "" {
+		projectID, err := strconv.ParseInt(projectIDStr, 10, 64)
+		if err != nil {
+			logger.Fatalf("Invalid project ID: %v", err)
+			os.Exit(1)
+		}
+		categoryID, err := strconv.ParseInt(categoryIDStr, 10, 64)
+		if err != nil {
+			logger.Fatalf("Invalid category ID: %v", err)
+			os.Exit(1)
+		}
+		amount, err := strconv.ParseFloat(amountStr, 64)
+		if err != nil {
+			logger.Fatalf("Invalid amount: %v", err)
+			os.Exit(1)
+		}
+
+		req := harvest.ExpenseCreateRequest{
+			ProjectID:         projectID,
+			ExpenseCategoryID: categoryID,
+			SpentDate:         dateStr,
+			TotalCost:         amount,
+		}
+		if notes != "" {
+			req.Notes = &notes
+		}
+
+		exp, err := client.CreateExpense(req)
+		if err != nil {
+			logger.Fatalf("Failed to create expense: %v", err)
+			os.Exit(1)
+		}
+		fmt.Printf("Created expense #%d: $%.2f - %s (%s) [%s]\n",
+			exp.ID, exp.TotalCost, exp.ExpenseCategory.Name, exp.Project.Name, exp.SpentDate)
+		return
+	}
+
+	// Interactive mode: select project
+	projects, err := client.ListProjects()
+	if err != nil {
+		logger.Fatalf("Failed to list projects: %v", err)
+		os.Exit(1)
+	}
+	projectOptions := make([]string, len(projects))
+	for i, p := range projects {
+		projectOptions[i] = fmt.Sprintf("%s \033[36m(%s)\033[0m", p.Name, p.Client.Name)
+	}
+	idx, err := prompt.SelectPrompt(projectOptions, "Select a project:")
+	if err != nil {
+		logger.Fatalf("prompt error: %v", err)
+		os.Exit(1)
+	}
+	selectedProject := projects[idx]
+
+	// Interactive mode: select expense category
+	categories, err := client.ListExpenseCategories()
+	if err != nil {
+		logger.Fatalf("Failed to list expense categories: %v", err)
+		os.Exit(1)
+	}
+	if len(categories) == 0 {
+		logger.Fatalf("No expense categories found")
+		os.Exit(1)
+	}
+	categoryOptions := make([]string, len(categories))
+	for i, c := range categories {
+		categoryOptions[i] = c.Name
+	}
+	idx, err = prompt.SelectPrompt(categoryOptions, "Select an expense category:")
+	if err != nil {
+		logger.Fatalf("prompt error: %v", err)
+		os.Exit(1)
+	}
+	selectedCategory := categories[idx]
+
+	// Interactive mode: prompt for amount
+	amountStr, err = prompt.InputPrompt("Amount:", "")
+	if err != nil {
+		logger.Fatalf("prompt error: %v", err)
+		os.Exit(1)
+	}
+	amount, err := strconv.ParseFloat(amountStr, 64)
+	if err != nil {
+		logger.Fatalf("Invalid amount: %v", err)
+		os.Exit(1)
+	}
+
+	// Interactive mode: prompt for notes
+	var expenseNotes string
+	expenseNotes, err = prompt.InputPrompt("Notes (optional):", notes)
+	if err != nil {
+		logger.Fatalf("prompt error: %v", err)
+		os.Exit(1)
+	}
+
+	req := harvest.ExpenseCreateRequest{
+		ProjectID:         selectedProject.ID,
+		ExpenseCategoryID: selectedCategory.ID,
+		SpentDate:         dateStr,
+		TotalCost:         amount,
+	}
+	if expenseNotes != "" {
+		req.Notes = &expenseNotes
+	}
+
+	exp, err := client.CreateExpense(req)
+	if err != nil {
+		logger.Fatalf("Failed to create expense: %v", err)
+		os.Exit(1)
+	}
+	fmt.Printf("Created expense #%d: $%.2f - %s (%s) [%s]\n",
+		exp.ID, exp.TotalCost, exp.ExpenseCategory.Name, exp.Project.Name, exp.SpentDate)
+}
+
 func jsonMarshal(v interface{}) ([]byte, error) {
 	return json.MarshalIndent(v, "", "  ")
 }
@@ -480,6 +600,11 @@ func main() {
 	var fromDate string
 	var toDate string
 	var jsonOutput bool
+	var createExpense bool
+	var expenseProjectID string
+	var expenseCategoryID string
+	var expenseAmount string
+	var expenseDate string
 	flag.StringVar(&note, "n", "", "Initial notes text")
 	flag.StringVar(&configPath, "c", config.DefaultConfigPath(), "Config file path")
 	flag.BoolVar(&ignoreConfig, "i", false, "Ignore loading local configuration")
@@ -495,6 +620,11 @@ func main() {
 	flag.StringVar(&fromDate, "from", "", "From date (YYYY-MM-DD)")
 	flag.StringVar(&toDate, "to", "", "To date (YYYY-MM-DD)")
 	flag.BoolVar(&jsonOutput, "json", false, "Output as raw JSON")
+	flag.BoolVar(&createExpense, "create", false, "Create a new expense (must be used with -E)")
+	flag.StringVar(&expenseProjectID, "project-id", "", "Project ID for expense")
+	flag.StringVar(&expenseCategoryID, "category-id", "", "Expense category ID")
+	flag.StringVar(&expenseAmount, "amount", "", "Expense total cost")
+	flag.StringVar(&expenseDate, "date", "", "Expense date (YYYY-MM-DD, default: today)")
 	var ticket string
 	flag.StringVar(&ticket, "t", "", "External ticket number to prefix notes")
 	flag.Parse()
@@ -522,6 +652,12 @@ func main() {
 	// Check for conflicting flags with -a
 	if addMinutes > 0 && (selectEntry || showStatus || stopTimer) {
 		logger.Fatalf("-a flag cannot be used with -e, -s, or -q flags")
+		os.Exit(1)
+	}
+
+	// Validate --create flag
+	if createExpense && !listExpenses {
+		logger.Fatalf("--create flag must be used with -E flag")
 		os.Exit(1)
 	}
 
@@ -611,8 +747,12 @@ func main() {
 		return
 	}
 
-	// Handle expense listing
+	// Handle expense listing / creation
 	if listExpenses {
+		if createExpense {
+			handleExpenseCreate(client, globalCfg.HarvestUserID, logger, expenseProjectID, expenseCategoryID, expenseAmount, expenseDate, note)
+			return
+		}
 		var from, to *string
 		if fromDate != "" {
 			from = &fromDate

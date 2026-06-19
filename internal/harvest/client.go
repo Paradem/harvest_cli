@@ -240,3 +240,29 @@ func (c *Client) ListExpenses(from, to *string) ([]ExpenseDetail, error) {
 	}
 	return res.Expenses, nil
 }
+
+func (c *Client) ListExpenseCategories() ([]ExpenseCategory, error) {
+	req, err := c.newRequest("GET", "/expense_categories?is_active=true", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var res ExpenseCategoryListResponse
+	if err := c.do(req, &res); err != nil {
+		return nil, err
+	}
+	return res.ExpenseCategories, nil
+}
+
+func (c *Client) CreateExpense(reqBody ExpenseCreateRequest) (*ExpenseDetail, error) {
+	req, err := c.newRequest("POST", "/expenses", reqBody)
+	if err != nil {
+		return nil, err
+	}
+
+	var res ExpenseDetail
+	if err := c.do(req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}

@@ -157,3 +157,19 @@ type ExpenseListResponse struct {
 	TotalPages int             `json:"total_pages"`
 	NextPage   *int            `json:"next_page"`
 }
+
+type ExpenseCategoryListResponse struct {
+	ExpenseCategories []ExpenseCategory `json:"expense_categories"`
+	PerPage           int               `json:"per_page"`
+	TotalPages        int               `json:"total_pages"`
+	NextPage          *int              `json:"next_page"`
+}
+
+type ExpenseCreateRequest struct {
+	ProjectID         int64   `json:"project_id"`
+	ExpenseCategoryID int64   `json:"expense_category_id"`
+	SpentDate         string  `json:"spent_date"`
+	TotalCost         float64 `json:"total_cost"`
+	Notes             *string `json:"notes,omitempty"`
+	Billable          *bool   `json:"billable,omitempty"`
+}
